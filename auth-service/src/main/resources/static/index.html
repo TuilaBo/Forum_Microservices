@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diễn đàn trường - Đăng nhập / Đăng ký</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 12px;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        .info {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #1976d2;
+        }
+        .token-display {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            font-size: 12px;
+            word-break: break-all;
+            display: none;
+        }
+        .token-display.show {
+            display: block;
+        }
+        .user-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8f5e9;
+            border-radius: 8px;
+            display: none;
+        }
+        .user-info.show {
+            display: block;
+        }
+        .user-info h3 {
+            color: #2e7d32;
+            margin-bottom: 10px;
+        }
+        .user-info p {
+            margin: 5px 0;
+            color: #333;
+        }
+        .logout-btn {
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Diễn đàn trường</h1>
+        <p class="subtitle">Đăng nhập hoặc đăng ký tài khoản mới</p>
+
+        <button class="btn btn-primary" onclick="login()">Đăng nhập</button>
+        <button class="btn btn-secondary" onclick="register()">Đăng ký tài khoản mới</button>
+
+        <div class="info">
+            <strong>Hướng dẫn:</strong><br>
+            • Nhấn "Đăng nhập" nếu đã có tài khoản<br>
+            • Nhấn "Đăng ký" để tạo tài khoản mới<br>
+            • Sau khi đăng nhập thành công, bạn sẽ được chuyển về trang này với token
+        </div>
+
+        <div class="token-display" id="tokenDisplay">
+            <strong>Access Token:</strong><br>
+            <pre id="tokenText"></pre>
+            <button class="btn btn-primary" onclick="testAuthService()">Test với Auth Service</button>
+        </div>
+
+        <div class="user-info" id="userInfo">
+            <h3>Thông tin người dùng:</h3>
+            <p><strong>ID:</strong> <span id="userId"></span></p>
+            <p><strong>Username:</strong> <span id="username"></span></p>
+            <p><strong>Email:</strong> <span id="email"></span></p>
+            <p><strong>Roles:</strong> <span id="roles"></span></p>
+            <button class="btn btn-secondary logout-btn" onclick="logout()">Đăng xuất</button>
+        </div>
+    </div>
+
+    <script>
+        // Cấu hình Keycloak - THAY ĐỔI CÁC GIÁ TRỊ NÀY THEO KEYCLOAK CỦA BẠN
+        const KEYCLOAK_URL = 'http://localhost:8080';
+        const REALM = 'school-forum';
+        const CLIENT_ID = 'forum-frontend';
+        const REDIRECT_URI = window.location.origin + window.location.pathname;
+
+        // Kiểm tra xem có token trong URL không (sau khi redirect từ Keycloak)
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const error = urlParams.get('error');
+
+        if (error) {
+            alert('Lỗi đăng nhập: ' + error);
+            // Xóa error param khỏi URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (code) {
+            // Đã có code từ Keycloak, đổi lấy token
+            exchangeCodeForToken(code);
+        } else {
+            // Kiểm tra xem có token trong localStorage không
+            const savedToken = localStorage.getItem('access_token');
+            if (savedToken) {
+                displayToken(savedToken);
+                fetchUserInfo(savedToken);
+            }
+        }
+
+        function login() {
+            const loginUrl = `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/auth` +
+                `?client_id=${CLIENT_ID}` +
+                `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+                `&response_type=code` +
+                `&scope=openid profile email`;
+            
+            window.location.href = loginUrl;
+        }
+
+        function register() {
+            const registerUrl = `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/registrations` +
+                `?client_id=${CLIENT_ID}` +
+                `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+                `&response_type=code` +
+                `&scope=openid profile email`;
+            
+            window.location.href = registerUrl;
+        }
+
+        async function exchangeCodeForToken(code) {
+            try {
+                // Xóa code khỏi URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+
+                const tokenUrl = `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/token`;
+                const params = new URLSearchParams({
+                    grant_type: 'authorization_code',
+                    code: code,
+                    client_id: CLIENT_ID,
+                    redirect_uri: REDIRECT_URI
+                });
+
+                const response = await fetch(tokenUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: params
+                });
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error('Lỗi khi lấy token: ' + error);
+                }
+
+                const data = await response.json();
+                const accessToken = data.access_token;
+
+                // Lưu token vào localStorage
+                localStorage.setItem('access_token', accessToken);
+                localStorage.setItem('refresh_token', data.refresh_token);
+
+                displayToken(accessToken);
+                fetchUserInfo(accessToken);
+            } catch (error) {
+                console.error('Lỗi:', error);
+                alert('Lỗi khi lấy token: ' + error.message);
+            }
+        }
+
+        function displayToken(token) {
+            document.getElementById('tokenDisplay').classList.add('show');
+            document.getElementById('tokenText').textContent = token.substring(0, 100) + '...';
+        }
+
+        async function fetchUserInfo(token) {
+            try {
+                // Decode JWT để lấy thông tin user (client-side decode, không verify)
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                
+                document.getElementById('userId').textContent = payload.sub || 'N/A';
+                document.getElementById('username').textContent = payload.preferred_username || 'N/A';
+                document.getElementById('email').textContent = payload.email || 'N/A';
+                
+                // Lấy roles
+                const realmRoles = payload.realm_access?.roles || [];
+                const resourceRoles = payload.resource_access || {};
+                let rolesText = realmRoles.join(', ');
+                if (Object.keys(resourceRoles).length > 0) {
+                    rolesText += ' | Client roles: ' + JSON.stringify(resourceRoles);
+                }
+                document.getElementById('roles').textContent = rolesText || 'Không có role';
+
+                document.getElementById('userInfo').classList.add('show');
+            } catch (error) {
+                console.error('Lỗi khi decode token:', error);
+            }
+        }
+
+        async function testAuthService() {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                alert('Không có token! Vui lòng đăng nhập trước.');
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:8081/auth/me', {
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status + ': ' + await response.text());
+                }
+
+                const userInfo = await response.json();
+                alert('Test thành công!\n\nThông tin từ Auth Service:\n' + 
+                      JSON.stringify(userInfo, null, 2));
+            } catch (error) {
+                alert('Lỗi khi test Auth Service:\n' + error.message + 
+                      '\n\nĐảm bảo:\n' +
+                      '1. Auth Service đang chạy trên port 8081\n' +
+                      '2. Keycloak đang chạy và realm "school-forum" đã được cấu hình\n' +
+                      '3. Token còn hiệu lực');
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            document.getElementById('tokenDisplay').classList.remove('show');
+            document.getElementById('userInfo').classList.remove('show');
+            
+            // Redirect đến Keycloak logout
+            const logoutUrl = `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/logout` +
+                `?redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+            window.location.href = logoutUrl;
+        }
+    </script>
+</body>
+</html>
+
