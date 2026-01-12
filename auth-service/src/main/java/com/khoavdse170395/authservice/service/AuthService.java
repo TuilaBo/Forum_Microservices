@@ -1,5 +1,6 @@
 package com.khoavdse170395.authservice.service;
 
+import com.khoavdse170395.authservice.model.AuthResponse;
 import com.khoavdse170395.authservice.model.LoginRequest;
 import com.khoavdse170395.authservice.model.RegisterRequest;
 import com.khoavdse170395.authservice.model.TokenResponse;
@@ -16,9 +17,20 @@ public interface AuthService {
 
     TokenResponse exchangeCodeForToken(String code, String redirectUri);
 
-    TokenResponse login(LoginRequest request);
+    /**
+     * Login và trả về AuthResponse cho Next.js.
+     */
+    AuthResponse login(LoginRequest request);
 
-    TokenResponse register(RegisterRequest request);
+    /**
+     * Register user mới với role ROLE_STUDENT mặc định và trả về AuthResponse cho Next.js.
+     */
+    AuthResponse register(RegisterRequest request);
+
+    /**
+     * Refresh access token bằng refresh token.
+     */
+    AuthResponse refreshToken(String refreshToken);
 }
 
 

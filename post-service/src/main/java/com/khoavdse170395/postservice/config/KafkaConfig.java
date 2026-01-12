@@ -1,6 +1,5 @@
 package com.khoavdse170395.postservice.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,9 +51,6 @@ public class KafkaConfig {
         // Serialize key (postId) thành String
         configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         
-        // Serialize value (Event object) thành JSON
-        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
-        
         // Đảm bảo message được ghi vào tất cả replicas (high durability)
         configProps.put(ProducerConfig.ACKS_CONFIG, "all");
         
@@ -64,7 +60,16 @@ public class KafkaConfig {
         // Idempotent producer: đảm bảo không gửi duplicate messages
         configProps.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
         
-        return new DefaultKafkaProducerFactory<>(configProps);
+        // Serialize value (Event object) thành JSON
+        // Configure JsonSerializer để không gửi type information trong headers
+        // Để các services khác có thể deserialize vào class của riêng chúng
+        JsonSerializer<Object> jsonSerializer = new JsonSerializer<>();
+        jsonSerializer.setAddTypeInfo(false); // Không thêm type information vào headers
+        
+        // Tạo ProducerFactory với custom serializer
+        DefaultKafkaProducerFactory<String, Object> factory = new DefaultKafkaProducerFactory<>(configProps);
+        factory.setValueSerializer(jsonSerializer);
+        return factory;
     }
 
     /**
