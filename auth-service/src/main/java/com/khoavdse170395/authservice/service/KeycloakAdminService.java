@@ -29,4 +29,14 @@ public interface KeycloakAdminService {
      * Lấy user info từ JWT token.
      */
     Map<String, Object> getUserInfoFromToken(Jwt jwt);
+
+    /**
+     * Tìm userId theo email.
+     */
+    String findUserIdByEmail(String email);
+
+    /**
+     * Đổi mật khẩu user theo userId.
+     */
+    void updateUserPassword(String userId, String newPassword);
 }

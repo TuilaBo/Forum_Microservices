@@ -52,8 +52,16 @@ public class CommentEventConsumer {
             event = objectMapper.convertValue(payload, CommentCreatedEvent.class);
             logger.info("Received CommentCreatedEvent: {}", event);
             
-            // ⭐ LƯU NOTIFICATION VÀO DATABASE CHO CHỦ BÀI VIẾT (KHÔNG GỬI EMAIL)
+            // ⭐ KIỂM TRA: Không gửi notification nếu người comment chính là chủ bài viết
             if (event.getPostAuthorId() != null && !event.getPostAuthorId().isEmpty()) {
+                // So sánh authorId (người comment) với postAuthorId (chủ bài viết)
+                if (event.getAuthorId() != null && event.getAuthorId().equals(event.getPostAuthorId())) {
+                    logger.info("Skipping notification: User {} commented on their own post (postId: {}, commentId: {})", 
+                        event.getAuthorId(), event.getPostId(), event.getCommentId());
+                    return; // Không tạo notification
+                }
+                
+                // ⭐ LƯU NOTIFICATION VÀO DATABASE CHO CHỦ BÀI VIẾT (KHÔNG GỬI EMAIL)
                 notificationService.createCommentNotification(
                     event.getPostAuthorId(),        // User A (chủ bài viết)
                     event.getAuthorUsername(),      // User B (người comment)

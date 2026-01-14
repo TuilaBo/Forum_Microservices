@@ -169,4 +169,52 @@ public class KeycloakAdminServiceImpl implements KeycloakAdminService {
 
         return userInfo;
     }
+
+    @Override
+    public String findUserIdByEmail(String email) {
+        String adminToken = getAdminAccessToken();
+        // Dùng search để linh hoạt hơn, lấy user đầu tiên khớp với email/username
+        String url = keycloakUrl + "/admin/realms/" + realm + "/users?search="
+                + URLEncoder.encode(email, StandardCharsets.UTF_8);
+        try {
+            var response = restClient.get()
+                    .uri(url)
+                    .header("Authorization", "Bearer " + adminToken)
+                    .retrieve()
+                    .body(List.class);
+            if (response == null || response.isEmpty()) {
+                return null;
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> user = (Map<String, Object>) response.get(0);
+            return (String) user.get("id");
+        } catch (Exception e) {
+            logger.error("Error finding user by email", e);
+            throw new RuntimeException("Failed to find user by email: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void updateUserPassword(String userId, String newPassword) {
+        String adminToken = getAdminAccessToken();
+        String url = keycloakUrl + "/admin/realms/" + realm + "/users/" + userId + "/reset-password";
+        try {
+            Map<String, Object> credential = Map.of(
+                    "type", "password",
+                    "value", newPassword,
+                    "temporary", false
+            );
+            String body = objectMapper.writeValueAsString(credential);
+            restClient.put()
+                    .uri(url)
+                    .header("Authorization", "Bearer " + adminToken)
+                    .header("Content-Type", "application/json")
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception e) {
+            logger.error("Error updating user password", e);
+            throw new RuntimeException("Failed to update user password: " + e.getMessage());
+        }
+    }
 }

@@ -11,4 +11,7 @@ public class JwtConverterConfig {
     public JwtAuthConverter jwtAuthConverter() {
         return new JwtAuthConverter();
     }
+
+    // JwtDecoder sẽ được Spring Boot tự động tạo từ spring.security.oauth2.resourceserver.jwt.issuer-uri
+    // Không cần tạo bean thủ công để tránh lỗi khi Keycloak chưa sẵn sàng
 }
