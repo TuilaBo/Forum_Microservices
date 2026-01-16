@@ -1,0 +1,23 @@
+{
+    "name": "postservice-posts-connector",
+    "config": {
+      "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+      "tasks.max": "1",
+      "database.hostname": "host.docker.internal",
+      "database.port": "5432",
+      "database.user": "debezium",
+      "database.password": "dbz",
+      "database.dbname": "post_forum_db",
+      "database.server.name": "dbserver1",
+      "topic.prefix": "dbserver1",
+      "slot.name": "postservice_slot",
+      "plugin.name": "pgoutput",
+      "publication.name": "dbz_publication",
+      "table.include.list": "public.posts",
+      "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+      "key.converter.schemas.enable": "false",
+      "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+      "value.converter.schemas.enable": "false",
+      "tombstones.on.delete": "false"
+    }
+  }
