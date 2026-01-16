@@ -1,5 +1,6 @@
 package com.khoavdse170395.postservice.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.khoavdse170395.postservice.kafka.PostEventProducer;
 import com.khoavdse170395.postservice.model.Post;
 import com.khoavdse170395.postservice.model.PostStatus;
@@ -16,9 +17,11 @@ import com.khoavdse170395.postservice.service.PostService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.List;
 
 @Service
@@ -33,6 +36,15 @@ public class PostServiceImpl implements PostService {
 
     @Autowired
     private PostEventProducer postEventProducer;
+
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    private static final String CACHE_KEY_PREFIX = "post:";
+    private static final Duration CACHE_TTL = Duration.ofMinutes(30);
 
     @Override
     public PostResponse createPost(CreatePostRequest request, String userId, String username) {
@@ -131,9 +143,25 @@ public class PostServiceImpl implements PostService {
     @Override
     @Transactional(readOnly = true)
     public PostResponse getPostById(Long id) {
+        String cacheKey = CACHE_KEY_PREFIX + id;
+
+        // Check cache first
+        Object cachedObj = redisTemplate.opsForValue().get(cacheKey);
+        if (cachedObj != null) {
+            // Redis deserializes thành LinkedHashMap -> convert sang PostResponse
+            PostResponse cached = objectMapper.convertValue(cachedObj, PostResponse.class);
+            return cached;
+        }
+
+        // Cache miss - query database
         Post post = postRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Post not found with id: " + id));
-        return mapToResponse(post);
+        PostResponse response = mapToResponse(post);
+
+        // Update cache
+        redisTemplate.opsForValue().set(cacheKey, response, CACHE_TTL);
+
+        return response;
     }
 
     @Override
